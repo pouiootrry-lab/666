@@ -1,0 +1,14 @@
+{
+  "name": "tool-checkout",
+  "version": "1.0.0",
+  "description": "即時同步工具借出管理系統",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.7.5"
+  }
+}
