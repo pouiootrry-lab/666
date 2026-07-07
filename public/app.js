@@ -539,20 +539,71 @@
     $('#modal-title').textContent = `紀錄明細 — ${record.date}`;
     const statusLabels = { checkout: '借出', return: '歸還', onsite: '現場' };
 
+    // Active items (not yet returned) that can be acted on
+    const activeItems = record.items.filter(i => i.status === 'checkout' || i.status === 'onsite');
+    const doneItems = record.items.filter(i => i.status === 'return');
+
     let html = `
       <div class="detail-row"><span class="detail-label">📅 日期</span><span class="detail-value">${record.date}</span></div>
       <div class="detail-row"><span class="detail-label">🚗 車號</span><span class="detail-value">${esc(record.vehicle)}</span></div>
       <div class="detail-row"><span class="detail-label">📍 地點</span><span class="detail-value">${esc(record.location)}</span></div>
       <div class="detail-row"><span class="detail-label">狀態</span><span class="detail-value">${record.returnedAt ? '✅ 已歸還' : '📦 外借中'}</span></div>
-      <div class="detail-tools-list">
-        <div class="detail-staff-label">🛠️ 工具清單 (${record.items.length} 項)</div>
-        ${record.items.map(item => `
-          <div class="detail-tool-item">
-            <span class="detail-tool-name">${esc(item.name)}</span>
-            <span class="detail-tool-status ${item.status}">${statusLabels[item.status] || item.status}</span>
+    `;
+
+    // Already returned items (read-only)
+    if (doneItems.length > 0) {
+      html += `
+        <div class="detail-tools-list">
+          <div class="detail-staff-label">✅ 已歸還 (${doneItems.length} 項)</div>
+          ${doneItems.map(item => `
+            <div class="detail-tool-item">
+              <span class="detail-tool-name">${esc(item.name)}</span>
+              <span class="detail-tool-status return">${statusLabels[item.status] || item.status}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // Active items with interactive return/onsite selection
+    if (activeItems.length > 0 && !record.returnedAt) {
+      html += `
+        <div class="detail-tools-list" id="modal-active-items">
+          <div class="detail-staff-label" style="display:flex;align-items:center;justify-content:space-between;">
+            <span>📦 外借中 / 現場 (${activeItems.length} 項)</span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn-mini btn-mini-return" id="modal-select-all-return">全選歸還</button>
+              <button class="btn-mini btn-mini-onsite" id="modal-select-all-onsite">全選現場</button>
+              <button class="btn-mini btn-mini-clear" id="modal-deselect-all">清除</button>
+            </div>
           </div>
-        `).join('')}
-      </div>
+          ${activeItems.map(item => `
+            <div class="detail-tool-item modal-item-row" data-tool-id="${esc(item.toolId)}">
+              <span class="detail-tool-name">${esc(item.name)}</span>
+              <span class="detail-tool-status ${item.status}">${statusLabels[item.status] || item.status}</span>
+              <div class="modal-item-actions">
+                <button class="modal-action-btn modal-return-btn ${item.status === 'return' ? 'active' : ''}" data-tool-id="${esc(item.toolId)}" data-action="return">歸還</button>
+                <button class="modal-action-btn modal-onsite-btn ${item.status === 'onsite' ? 'active-onsite' : ''}" data-tool-id="${esc(item.toolId)}" data-action="onsite">現場</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    } else if (activeItems.length > 0 && record.returnedAt) {
+      html += `
+        <div class="detail-tools-list">
+          <div class="detail-staff-label">📦 工具清單 (${record.items.length} 項)</div>
+          ${record.items.map(item => `
+            <div class="detail-tool-item">
+              <span class="detail-tool-name">${esc(item.name)}</span>
+              <span class="detail-tool-status ${item.status}">${statusLabels[item.status] || item.status}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    html += `
       <div class="detail-staff-section">
         <div class="detail-staff-label">👤 借出人員</div>
         <div class="detail-staff-names">
@@ -572,29 +623,127 @@
       `;
     }
 
-    if (!record.returnedAt) {
-      html += `<div style="margin-top:20px;text-align:center;">
-        <button class="btn btn-success btn-lg" id="modal-return-btn">✅ 全部歸還</button>
-      </div>`;
+    // Return staff selector + confirm button (only if not fully returned)
+    if (!record.returnedAt && activeItems.length > 0) {
+      html += `
+        <div class="detail-staff-section" style="margin-top:16px;">
+          <div class="detail-staff-label">👤 選擇歸還人員</div>
+          <div class="modal-return-staff" id="modal-return-staff-selector">
+            ${staffNames.map(name => `
+              <button type="button" class="staff-btn modal-staff-pick" data-name="${esc(name)}">${esc(name)}</button>
+            `).join('')}
+          </div>
+        </div>
+        <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-success btn-lg" id="modal-partial-return-btn">✅ 確認更新狀態</button>
+          <button class="btn btn-warning btn-lg" id="modal-return-all-btn">⚡ 全部歸還</button>
+        </div>
+      `;
     }
 
     $('#modal-body').innerHTML = html;
     $('#record-modal').classList.add('show');
 
-    const returnBtn = $('#modal-return-btn');
-    if (returnBtn) {
-      returnBtn.addEventListener('click', () => {
-        socket.emit('return-record', { recordId, returnStaff: record.checkoutStaff });
-        closeModal();
-        showToast('success', '✅ 工具已全部歸還');
+    // Track per-item action selections
+    const itemActions = {};
+    activeItems.forEach(item => { itemActions[item.toolId] = null; });
+
+    // Track selected return staff
+    let modalReturnStaff = [];
+
+    // Item action button logic
+    const updateItemBtn = (toolId, action) => {
+      const row = document.querySelector(`.modal-item-row[data-tool-id="${toolId}"]`);
+      if (!row) return;
+      row.querySelectorAll('.modal-action-btn').forEach(b => {
+        b.classList.remove('active', 'active-onsite');
       });
-    }
+      if (action === 'return') {
+        row.querySelector('.modal-return-btn')?.classList.add('active');
+      } else if (action === 'onsite') {
+        row.querySelector('.modal-onsite-btn')?.classList.add('active-onsite');
+      }
+    };
+
+    document.querySelectorAll('.modal-action-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const toolId = btn.dataset.toolId;
+        const action = btn.dataset.action;
+        // Toggle: click same again = deselect
+        itemActions[toolId] = itemActions[toolId] === action ? null : action;
+        updateItemBtn(toolId, itemActions[toolId]);
+      });
+    });
+
+    // Batch select buttons
+    const selectAll = (action) => {
+      activeItems.forEach(item => {
+        itemActions[item.toolId] = action;
+        updateItemBtn(item.toolId, action);
+      });
+    };
+    document.getElementById('modal-select-all-return')?.addEventListener('click', () => selectAll('return'));
+    document.getElementById('modal-select-all-onsite')?.addEventListener('click', () => selectAll('onsite'));
+    document.getElementById('modal-deselect-all')?.addEventListener('click', () => {
+      activeItems.forEach(item => {
+        itemActions[item.toolId] = null;
+        updateItemBtn(item.toolId, null);
+      });
+    });
+
+    // Return staff selector
+    document.querySelectorAll('.modal-staff-pick').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const name = btn.dataset.name;
+        const idx = modalReturnStaff.indexOf(name);
+        if (idx > -1) { modalReturnStaff.splice(idx, 1); btn.classList.remove('active'); }
+        else { modalReturnStaff.push(name); btn.classList.add('active'); }
+      });
+    });
+
+    // Confirm partial return
+    document.getElementById('modal-partial-return-btn')?.addEventListener('click', () => {
+      const updates = Object.entries(itemActions).filter(([, action]) => action !== null);
+      if (updates.length === 0) { showToast('warning', '請先選擇要更新的工具項目！'); return; }
+      if (modalReturnStaff.length === 0) { showToast('warning', '請選擇歸還人員！'); return; }
+
+      // Build updated items array
+      const updatedItems = record.items.map(item => {
+        const newAction = itemActions[item.toolId];
+        if (newAction !== null && newAction !== undefined) {
+          return { ...item, status: newAction };
+        }
+        return item;
+      });
+
+      // Check if all items are returned
+      const allReturned = updatedItems.every(i => i.status === 'return');
+
+      socket.emit('edit-record', {
+        id: record.id,
+        items: updatedItems,
+        returnStaff: modalReturnStaff,
+        returnedAt: allReturned ? new Date().toISOString() : null
+      });
+
+      closeModal();
+      showToast('success', `✅ 已更新 ${updates.length} 項工具狀態`);
+    });
+
+    // Return all button
+    document.getElementById('modal-return-all-btn')?.addEventListener('click', () => {
+      const staff = modalReturnStaff.length > 0 ? modalReturnStaff : record.checkoutStaff;
+      socket.emit('return-record', { recordId, returnStaff: staff });
+      closeModal();
+      showToast('success', '✅ 工具已全部歸還');
+    });
   }
 
   function closeModal() {
     $('#record-modal').classList.remove('show');
     currentModalRecordId = null;
   }
+
 
   // ===================================================
   //  ADMIN PANEL RENDERING

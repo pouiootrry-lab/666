@@ -923,3 +923,140 @@ body::before {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ===================================================
+   部分歸還 Modal 新樣式
+   =================================================== */
+
+/* 工具列每一行 */
+.modal-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-glass);
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+/* 工具列中的操作按鈕區 */
+.modal-item-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* 歸還 / 現場 小按鈕 */
+.modal-action-btn {
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.modal-action-btn:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-primary);
+}
+.modal-action-btn.active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+.modal-action-btn.active-onsite {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+/* 批次快速按鈕（全選歸還 / 全選現場 / 清除）*/
+.btn-mini {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-size: 0.68rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.btn-mini-return {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--accent-green);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+.btn-mini-return:hover {
+  background: rgba(16, 185, 129, 0.25);
+}
+.btn-mini-onsite {
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--accent-blue);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+.btn-mini-onsite:hover {
+  background: rgba(59, 130, 246, 0.25);
+}
+.btn-mini-clear {
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  border-color: rgba(255,255,255,0.1);
+}
+.btn-mini-clear:hover {
+  background: rgba(255,255,255,0.1);
+  color: var(--text-secondary);
+}
+
+/* 歸還人員選擇器（在 Modal 內）*/
+.modal-return-staff {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* btn-warning for return-all */
+.btn-warning {
+  background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(251,146,60,0.1));
+  border: 1px solid rgba(245,158,11,0.35);
+  color: var(--accent-amber);
+}
+.btn-warning:hover {
+  background: linear-gradient(135deg, rgba(245,158,11,0.3), rgba(251,146,60,0.2));
+  border-color: var(--accent-amber);
+  transform: translateY(-1px);
+}
+
+/* detail-tool-item 確保 flex 佈局 */
+.detail-tool-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color);
+  flex-wrap: wrap;
+}
+.detail-tool-item:last-child { border-bottom: none; }
+.detail-tool-name { flex: 1; font-size: 0.85rem; color: var(--text-primary); }
+.detail-tool-status {
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.detail-tool-status.checkout {
+  background: rgba(245,158,11,0.15); color: var(--accent-amber);
+}
+.detail-tool-status.return {
+  background: rgba(16,185,129,0.15); color: var(--accent-green);
+}
+.detail-tool-status.onsite {
+  background: rgba(59,130,246,0.15); color: var(--accent-blue);
+}
+
