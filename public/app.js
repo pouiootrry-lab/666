@@ -123,6 +123,15 @@
     // Tool search
     $('#tool-search').addEventListener('input', () => renderToolsList());
 
+    // Location input → auto-fill onsite tools
+    let locationDebounce = null;
+    $('#location').addEventListener('input', () => {
+      clearTimeout(locationDebounce);
+      locationDebounce = setTimeout(() => {
+        autoFillOnsiteTools($('#location').value.trim());
+      }, 600);
+    });
+
     // History search & filters
     $('#history-search').addEventListener('input', (e) => {
       historySearch = e.target.value.trim().toLowerCase();
@@ -261,8 +270,11 @@
       `<span class="quick-tag" data-value="${esc(l)}">${esc(l)}</span>`
     ).join('');
     container.onclick = (e) => {
-      if (e.target.classList.contains('quick-tag'))
-        $('#location').value = e.target.dataset.value;
+      if (e.target.classList.contains('quick-tag')) {
+        const val = e.target.dataset.value;
+        $('#location').value = val;
+        autoFillOnsiteTools(val);
+      }
     };
   }
 
@@ -278,8 +290,32 @@
     ).join('');
     container.onclick = (e) => {
       const tag = e.target.closest('.location-hist-tag');
-      if (tag) $('#location').value = tag.dataset.value;
+      if (tag) {
+        $('#location').value = tag.dataset.value;
+        autoFillOnsiteTools(tag.dataset.value);
+      }
     };
+  }
+
+  // --- Auto-fill onsite tools matching current location ---
+  function autoFillOnsiteTools(location) {
+    if (!location) return;
+    const locationLower = location.trim().toLowerCase();
+    const { onsiteMap } = getToolAvailability();
+    let filled = 0;
+    onsiteMap.forEach((toolLocation, toolId) => {
+      if (toolLocation.trim().toLowerCase() === locationLower) {
+        // Only auto-fill if user hasn't manually set a status for this tool
+        if (!activeStatuses[toolId]) {
+          activeStatuses[toolId] = 'onsite';
+          filled++;
+        }
+      }
+    });
+    if (filled > 0) {
+      renderToolsList();
+      showToast('info', `📍 已自動帶入 ${filled} 項現場工具`);
+    }
   }
 
   // --- Render Staff Selectors ---
