@@ -13,6 +13,7 @@
   let vehicleTags = [];
   let locationTags = [];
   let categories = [];
+  let locationHistory = [];
   let activeStatuses = {};
   let selectedStaff = { checkout: [], return: [] };
   let historyFilter = 'all';
@@ -53,6 +54,7 @@
       vehicleTags = data.vehicleTags || [];
       locationTags = data.locationTags || [];
       categories = data.categories || [];
+      locationHistory = data.locationHistory || [];
 
       renderAll();
     });
@@ -77,11 +79,17 @@
     socket.on('online-count', (count) => {
       $('#online-count').textContent = count;
     });
+
+    socket.on('location-history-update', (hist) => {
+      locationHistory = hist || [];
+      renderLocationHistory();
+    });
   }
 
   function renderAll() {
     renderVehicleTags();
     renderLocationTags();
+    renderLocationHistory();
     renderToolsList();
     renderStaffSelectors();
     renderHistory();
@@ -255,6 +263,22 @@
     container.onclick = (e) => {
       if (e.target.classList.contains('quick-tag'))
         $('#location').value = e.target.dataset.value;
+    };
+  }
+
+  function renderLocationHistory() {
+    let container = $('#location-history-tags');
+    if (!container) return;
+    if (locationHistory.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = locationHistory.map(l =>
+      `<span class="quick-tag location-hist-tag" data-value="${esc(l)}" title="歷史地點">🕐 ${esc(l)}</span>`
+    ).join('');
+    container.onclick = (e) => {
+      const tag = e.target.closest('.location-hist-tag');
+      if (tag) $('#location').value = tag.dataset.value;
     };
   }
 

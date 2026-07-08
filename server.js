@@ -96,7 +96,8 @@ const ConfigSchema = new mongoose.Schema({
   staffNames: Array,
   vehicleTags: Array,
   locationTags: Array,
-  categories: Array
+  categories: Array,
+  locationHistory: { type: Array, default: [] }
 });
 
 const Record = mongoose.model('Record', RecordSchema);
@@ -115,10 +116,12 @@ async function getConfig() {
       staffNames: defaultStaff,
       vehicleTags: defaultVehicleTags,
       locationTags: defaultLocationTags,
-      categories: defaultCategories
+      categories: defaultCategories,
+      locationHistory: []
     });
     console.log('📋 已建立預設設定');
   }
+  if (!cfg.locationHistory) cfg.locationHistory = [];
   return cfg;
 }
 
@@ -207,6 +210,7 @@ async function startServer() {
         vehicleTags: cfg.vehicleTags,
         locationTags: cfg.locationTags,
         categories: cfg.categories,
+        locationHistory: cfg.locationHistory || [],
         onlineCount: onlineUsers.size
       });
     } catch (e) { console.error('init error:', e); }
@@ -265,7 +269,16 @@ async function startServer() {
               }
             }
           }
+          // Auto-update locationHistory (MongoDB)
+          if (record.location) {
+            const cfg = await getConfig();
+            const hist = cfg.locationHistory || [];
+            const newHist = [record.location, ...hist.filter(l => l !== record.location)].slice(0, 7);
+            await saveConfig({ locationHistory: newHist });
+            io.emit('location-history-update', newHist);
+          }
           io.emit('records-refresh', await getAllRecords());
+
         } else {
           global.memStore.records.unshift(record);
           // Cross-record return logic (in-memory)
@@ -282,6 +295,13 @@ async function startServer() {
                 if (!hasRemaining) { existing.returnedAt = new Date().toISOString(); if (existing.returnStaff.length === 0) existing.returnStaff = payload.checkoutStaff; }
               }
             });
+          }
+          // Auto-update locationHistory (in-memory)
+          if (record.location) {
+            const hist = global.memStore.locationHistory || [];
+            const newHist = [record.location, ...hist.filter(l => l !== record.location)].slice(0, 7);
+            global.memStore.locationHistory = newHist;
+            io.emit('location-history-update', newHist);
           }
           io.emit('records-refresh', global.memStore.records);
         }
