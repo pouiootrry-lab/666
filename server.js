@@ -498,6 +498,48 @@ async function startServer() {
       } catch (e) { console.error('edit-tool error:', e); }
     });
 
+    socket.on('reorder-tools', async (newOrder) => {
+      try {
+        if (MONGODB_URI) {
+          const cfg = await getConfig();
+          // Map to keep valid tools only
+          const toolMap = new Map(cfg.tools.map(t => [t.id, t]));
+          const updatedTools = [];
+          for (const item of newOrder) {
+            const tool = toolMap.get(item.id);
+            if (tool) {
+              tool.category = item.category;
+              updatedTools.push(tool);
+              toolMap.delete(item.id);
+            }
+          }
+          // Append any missing tools that weren't in the new order
+          for (const tool of toolMap.values()) {
+            updatedTools.push(tool);
+          }
+          cfg.tools = updatedTools;
+          await saveConfig({ tools: cfg.tools });
+          io.emit('config-refresh', { tools: cfg.tools, staffNames: cfg.staffNames, vehicleTags: cfg.vehicleTags, locationTags: cfg.locationTags, categories: cfg.categories });
+          console.log(`🔧🔄 更新工具排序`);
+        } else {
+          const s = global.memStore;
+          const toolMap = new Map(s.tools.map(t => [t.id, t]));
+          const updatedTools = [];
+          for (const item of newOrder) {
+            const tool = toolMap.get(item.id);
+            if (tool) {
+              tool.category = item.category;
+              updatedTools.push(tool);
+              toolMap.delete(item.id);
+            }
+          }
+          for (const tool of toolMap.values()) updatedTools.push(tool);
+          s.tools = updatedTools;
+          io.emit('config-refresh', { tools: s.tools, staffNames: s.staffNames, vehicleTags: s.vehicleTags, locationTags: s.locationTags, categories: s.categories });
+        }
+      } catch (e) { console.error('reorder-tools error:', e); }
+    });
+
     // ==========================================
     //  ADMIN: VEHICLE & LOCATION TAGS
     // ==========================================

@@ -1088,3 +1088,28 @@ body::before {
   border-color: rgba(59, 130, 246, 0.5) !important;
 }
 
+/* ===================================================
+   管理介面 Drag & Drop 排序
+   =================================================== */
+.admin-tool-item[draggable="true"] {
+  cursor: grab;
+}
+.admin-tool-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+.admin-tool-item.dragging {
+  opacity: 0.4;
+  background: var(--bg-glass-hover);
+}
+.admin-tool-list-container {
+  min-height: 20px;
+  border: 1px solid transparent;
+  transition: all var(--transition-fast);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+}
+.admin-tool-list-container.drag-over {
+  border: 1px dashed var(--accent-blue);
+  background: rgba(59, 130, 246, 0.05);
+}
+

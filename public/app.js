@@ -848,17 +848,25 @@
 
     categories.forEach(cat => {
       const catTools = tools.filter(t => t.category === cat);
-      if (catTools.length === 0) return;
-
+      // We render the category even if empty to allow dropping into it
       const catDiv = document.createElement('div');
       catDiv.className = 'admin-tool-category';
-      catDiv.innerHTML = `<div class="admin-tool-cat-header">${esc(cat)} (${catTools.length})</div>`;
+      catDiv.dataset.category = cat;
+      catDiv.innerHTML = `<div class="admin-tool-cat-header">${esc(cat)} (<span class="cat-count">${catTools.length}</span>)</div>`;
+      
+      const listDiv = document.createElement('div');
+      listDiv.className = 'admin-tool-list-container';
+      listDiv.dataset.category = cat;
 
       catTools.forEach(tool => {
         const row = document.createElement('div');
         row.className = 'admin-tool-item';
+        row.draggable = true;
+        row.dataset.id = tool.id;
+        row.dataset.category = tool.category;
         row.innerHTML = `
-          <span>
+          <span style="display:flex; align-items:center; gap:8px;">
+            <span style="cursor:grab; opacity:0.5;">⣿</span>
             <span class="admin-tool-item-name">${esc(tool.name)}</span>
             <span class="admin-tool-item-id">${tool.id}</span>
           </span>
@@ -871,11 +879,80 @@
             showToast('warning', `🔧 已移除工具: ${tool.name}`);
           }
         });
-        catDiv.appendChild(row);
+
+        // Drag events
+        row.addEventListener('dragstart', (e) => {
+          row.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', tool.id);
+        });
+        row.addEventListener('dragend', () => {
+          row.classList.remove('dragging');
+        });
+
+        listDiv.appendChild(row);
       });
 
+      // Drop events on list container
+      listDiv.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const dragging = container.querySelector('.dragging');
+        if (!dragging) return;
+        const afterElement = getDragAfterElement(listDiv, e.clientY);
+        if (afterElement == null) {
+          listDiv.appendChild(dragging);
+        } else {
+          listDiv.insertBefore(dragging, afterElement);
+        }
+        listDiv.classList.add('drag-over');
+      });
+
+      listDiv.addEventListener('dragleave', () => {
+        listDiv.classList.remove('drag-over');
+      });
+
+      listDiv.addEventListener('drop', (e) => {
+        e.preventDefault();
+        listDiv.classList.remove('drag-over');
+        saveNewToolOrder();
+      });
+
+      catDiv.appendChild(listDiv);
       container.appendChild(catDiv);
     });
+  }
+
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.admin-tool-item:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  function saveNewToolOrder() {
+    const newOrder = [];
+    document.querySelectorAll('.admin-tool-list-container').forEach(listContainer => {
+      const cat = listContainer.dataset.category;
+      listContainer.querySelectorAll('.admin-tool-item').forEach(item => {
+        newOrder.push({
+          id: item.dataset.id,
+          category: cat
+        });
+      });
+    });
+    // Optimistic update count
+    document.querySelectorAll('.admin-tool-category').forEach(catDiv => {
+      const count = catDiv.querySelectorAll('.admin-tool-item').length;
+      catDiv.querySelector('.cat-count').textContent = count;
+    });
+    socket.emit('reorder-tools', newOrder);
   }
 
   function renderAdminVehicles() {
